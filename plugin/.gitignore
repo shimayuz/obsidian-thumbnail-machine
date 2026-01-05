@@ -20,3 +20,6 @@ npm-debug.log*
 
 # TypeScript
 dist/
+
+# User data (contains API keys)
+data.json

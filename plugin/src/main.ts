@@ -585,13 +585,20 @@ class ThumbnailMachineSettingTab extends PluginSettingTab {
 
     // プロンプト設定セクション
     containerEl.createEl('h3', { text: 'Prompt Settings' });
+    
+    // 説明文を追加
+    const promptDesc = containerEl.createEl('p');
+    promptDesc.style.color = 'var(--text-muted)';
+    promptDesc.style.fontSize = '12px';
+    promptDesc.style.marginBottom = '15px';
+    promptDesc.textContent = '※ここで設定した内容は全ての生成に常に適用されます。一時的な指示はモーダルの「追加指示」を使用してください。';
 
     new Setting(containerEl)
-      .setName('Custom Prompt Prefix')
-      .setDesc('Text to add before the generated prompt')
+      .setName('Custom Prompt Prefix（文頭に追加）')
+      .setDesc('例: 「ペーパークラフト風のデザインで、」「ダークモード向けの配色で、」')
       .addTextArea((textarea: TextAreaComponent) => {
         textarea
-          .setPlaceholder('Add custom instructions...')
+          .setPlaceholder('例: ペーパークラフト風のデザインで、')
           .setValue(this.plugin.settings.customPromptPrefix)
           .onChange(async (value: string) => {
             this.plugin.settings.customPromptPrefix = value;
@@ -602,11 +609,11 @@ class ThumbnailMachineSettingTab extends PluginSettingTab {
       });
 
     new Setting(containerEl)
-      .setName('Custom Prompt Suffix')
-      .setDesc('Text to add after the generated prompt')
+      .setName('Custom Prompt Suffix（文末に追加）')
+      .setDesc('例: 「テキストは白色で大きく中央に配置」「背景はぼかしてください」')
       .addTextArea((textarea: TextAreaComponent) => {
         textarea
-          .setPlaceholder('Add custom instructions...')
+          .setPlaceholder('例: テキストは白色で大きく中央に配置してください')
           .setValue(this.plugin.settings.customPromptSuffix)
           .onChange(async (value: string) => {
             this.plugin.settings.customPromptSuffix = value;
