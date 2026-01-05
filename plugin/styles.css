@@ -1,0 +1,106 @@
+/* Thumbnail Machine Plugin Styles */
+
+/* Generation Modal */
+.thumbnail-machine-modal {
+  max-width: 500px;
+}
+
+.thumbnail-machine-modal h2 {
+  margin-bottom: 20px;
+}
+
+.thumbnail-machine-modal .setting-item {
+  border-top: none;
+  padding: 10px 0;
+}
+
+.thumbnail-machine-modal .setting-item-info {
+  flex: 1;
+}
+
+.thumbnail-machine-modal .setting-item-control {
+  flex: 2;
+}
+
+.thumbnail-preview-info {
+  margin-top: 15px;
+  padding: 10px;
+  background-color: var(--background-secondary);
+  border-radius: 5px;
+}
+
+.thumbnail-preview-info p {
+  margin: 0;
+}
+
+.modal-button-container {
+  display: flex;
+  justify-content: flex-end;
+  gap: 10px;
+  margin-top: 20px;
+  padding-top: 15px;
+  border-top: 1px solid var(--background-modifier-border);
+}
+
+/* Progress Modal */
+.thumbnail-progress-modal {
+  text-align: center;
+  padding: 20px;
+}
+
+.thumbnail-progress-modal h3 {
+  margin-bottom: 20px;
+}
+
+.progress-container {
+  margin: 20px 0;
+}
+
+.progress-bar-bg {
+  width: 100%;
+  height: 8px;
+  background-color: var(--background-modifier-border);
+  border-radius: 4px;
+  overflow: hidden;
+}
+
+.progress-bar {
+  height: 100%;
+  background-color: var(--interactive-accent);
+  transition: width 0.3s ease;
+}
+
+.progress-message {
+  color: var(--text-muted);
+  margin-top: 15px;
+}
+
+.spinner {
+  font-size: 24px;
+  animation: spin 1s linear infinite;
+}
+
+@keyframes spin {
+  from {
+    transform: rotate(0deg);
+  }
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+/* Settings Tab */
+.platform-info {
+  padding: 10px;
+  background-color: var(--background-secondary);
+  border-radius: 5px;
+  margin-top: 10px;
+}
+
+.platform-info p {
+  margin: 5px 0;
+}
+
+.platform-info strong {
+  color: var(--text-accent);
+}
