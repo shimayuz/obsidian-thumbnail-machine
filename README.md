@@ -141,6 +141,51 @@ npm run build
 ### Images not inserted into note
 → Check that "Auto-insert to Note" is enabled in settings
 
+## Customizing Prompts
+
+If you want to adjust the generated prompts, edit the following files.
+
+### Appeal Axis Prompt Elements
+
+**File**: `plugin/src/types.ts`
+
+Edit the `promptElements` for each appeal axis to customize the generated prompts.
+
+```typescript
+export const APPEAL_AXIS_CONFIGS: AppealAxisConfig[] = [
+  {
+    id: 'authority',
+    name: '権威性',
+    description: '専門家や実績をアピール',
+    promptElements: 'authoritative design with expert credentials, professional badges, certification symbols',
+  },
+  // ...
+];
+```
+
+### Prompt Generation Logic
+
+**File**: `plugin/src/api/api-client.ts`
+
+- `buildPrompt()`: Standard prompt generation
+- `buildAppealAxisPrompt()`: Appeal axis-based prompt generation
+
+```typescript
+// Appeal axis prompt format example
+let prompt = `YouTube thumbnail, professional design, `;
+prompt += `${axisConfig.promptElements}, `;
+prompt += `Japanese text "${request.title}", `;
+```
+
+### Apply Changes
+
+```bash
+cd plugin
+npm run build
+```
+
+After building, reload the plugin in Obsidian.
+
 ## License
 
 MIT

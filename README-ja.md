@@ -190,6 +190,51 @@ npm run build
 ### 画像がノートに挿入されない
 → 設定画面で「ノートに自動挿入」がONになっているか確認してください
 
+## プロンプトのカスタマイズ
+
+生成されるプロンプトを調整したい場合は、以下のファイルを編集してください。
+
+### 訴求軸のプロンプト要素
+
+**ファイル**: `plugin/src/types.ts`
+
+各訴求軸の `promptElements` を編集することで、生成されるプロンプトを調整できます。
+
+```typescript
+export const APPEAL_AXIS_CONFIGS: AppealAxisConfig[] = [
+  {
+    id: 'authority',
+    name: '権威性',
+    description: '専門家や実績をアピール',
+    promptElements: 'authoritative design with expert credentials, professional badges, certification symbols',
+  },
+  // ...
+];
+```
+
+### プロンプト生成ロジック
+
+**ファイル**: `plugin/src/api/api-client.ts`
+
+- `buildPrompt()`: 通常のプロンプト生成
+- `buildAppealAxisPrompt()`: 訴求軸ベースのプロンプト生成
+
+```typescript
+// 訴求軸プロンプトのフォーマット例
+let prompt = `YouTube thumbnail, professional design, `;
+prompt += `${axisConfig.promptElements}, `;
+prompt += `Japanese text "${request.title}", `;
+```
+
+### 編集後の反映
+
+```bash
+cd plugin
+npm run build
+```
+
+ビルド後、Obsidianでプラグインを再読み込みしてください。
+
 ## ライセンス
 
 MIT License
