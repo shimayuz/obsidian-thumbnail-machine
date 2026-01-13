@@ -265,6 +265,12 @@ export class KieApiClient implements ApiClient {
     prompt += `Size: ${config.width}x${config.height} pixels (${config.aspectRatio} aspect ratio)\n`;
     prompt += `The text should be clearly readable and be the main focus.\n`;
     prompt += `Do not include any watermarks or logos.\n`;
+    
+    // noteプラットフォーム用のセーフマージン指示
+    if (request.platform === 'note' && this.settings.noteSafeMargin) {
+      const margin = this.settings.noteSafeMarginSize || 20;
+      prompt += `IMPORTANT: Keep the top and bottom ${margin}px of the image empty (no text, no important elements). This is a safe margin area that may be cropped when displayed.\n`;
+    }
 
     if (this.settings.customPromptPrefix) {
       prompt = this.settings.customPromptPrefix + '\n' + prompt;
@@ -305,6 +311,12 @@ export class KieApiClient implements ApiClient {
 
     // アスペクト比を追加
     prompt += `--ar ${config.aspectRatio === '1.91:1' ? '16:9' : config.aspectRatio} --v 6`;
+    
+    // noteプラットフォーム用のセーフマージン指示
+    if (request.platform === 'note' && this.settings.noteSafeMargin) {
+      const margin = this.settings.noteSafeMarginSize || 20;
+      prompt += `, keep top and bottom ${margin}px empty as safe margin`;
+    }
 
     if (this.settings.customPromptPrefix) {
       prompt = this.settings.customPromptPrefix + '\n' + prompt;

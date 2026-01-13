@@ -623,6 +623,47 @@ class ThumbnailMachineSettingTab extends PluginSettingTab {
         textarea.inputEl.style.height = '80px';
       });
 
+    // noteプラットフォーム専用設定セクション
+    containerEl.createEl('h3', { text: 'note Platform Settings' });
+    
+    const noteDesc = containerEl.createEl('p');
+    noteDesc.style.color = 'var(--text-muted)';
+    noteDesc.style.fontSize = '12px';
+    noteDesc.style.marginBottom = '15px';
+    noteDesc.textContent = '※noteはYouTubeやUdemyより上下約50pxが切り取られて表示されます。セーフマージンを有効にすると、重要な要素が切り取られないよう上下に余白を確保します。';
+
+    new Setting(containerEl)
+      .setName('noteセーフマージン')
+      .setDesc('noteのサムネイル生成時、上下に余白を確保してテキストや重要な要素が切り取られないようにします')
+      .addToggle((toggle) =>
+        toggle
+          .setValue(this.plugin.settings.noteSafeMargin)
+          .onChange(async (value: boolean) => {
+            this.plugin.settings.noteSafeMargin = value;
+            await this.plugin.saveSettings();
+            this.display(); // 設定画面を再描画
+          })
+      );
+
+    // セーフマージンが有効な場合のみサイズ設定を表示
+    if (this.plugin.settings.noteSafeMargin) {
+      new Setting(containerEl)
+        .setName('セーフマージンサイズ')
+        .setDesc('上下に確保する余白のサイズ（px）。デフォルト: 20px')
+        .addText((text: TextComponent) =>
+          text
+            .setPlaceholder('20')
+            .setValue(String(this.plugin.settings.noteSafeMarginSize))
+            .onChange(async (value: string) => {
+              const num = parseInt(value, 10);
+              if (!isNaN(num) && num >= 0 && num <= 100) {
+                this.plugin.settings.noteSafeMarginSize = num;
+                await this.plugin.saveSettings();
+              }
+            })
+        );
+    }
+
     // プラットフォーム情報
     containerEl.createEl('h3', { text: 'Platform Information' });
     

@@ -76,6 +76,10 @@ export interface PluginSettings {
   // プロンプト設定
   customPromptPrefix: string;
   customPromptSuffix: string;
+  
+  // noteプラットフォーム専用設定
+  noteSafeMargin: boolean; // noteの上下セーフマージンを有効にするか
+  noteSafeMarginSize: number; // セーフマージンのサイズ（px）
 }
 
 /** デフォルト設定 */
@@ -93,6 +97,9 @@ export const DEFAULT_SETTINGS: PluginSettings = {
   
   customPromptPrefix: '',
   customPromptSuffix: '',
+  
+  noteSafeMargin: true,
+  noteSafeMarginSize: 20,
 };
 
 /** 参照画像データ */
