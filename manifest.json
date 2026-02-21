@@ -1,0 +1,10 @@
+{
+  "id": "thumbnail-machine",
+  "name": "Thumbnail Machine",
+  "version": "0.1.0",
+  "minAppVersion": "1.4.0",
+  "description": "Generate beautiful thumbnails for YouTube, note.com, and Udemy from your Obsidian notes using AI.",
+  "author": "",
+  "authorUrl": "",
+  "isDesktopOnly": false
+}
