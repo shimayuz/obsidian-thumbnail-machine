@@ -12,7 +12,7 @@ export interface ApiClient {
 }
 
 /**
- * KIE API クライアント (kie.ai - nano-banana-pro モデル)
+ * KIE API クライアント (kie.ai - nano-banana-2 モデル)
  */
 export class KieApiClient implements ApiClient {
   constructor(private settings: PluginSettings) {}
@@ -45,7 +45,7 @@ export class KieApiClient implements ApiClient {
     
     // 1. タスク作成
     const requestBody: any = {
-      model: 'nano-banana-pro',
+      model: 'nano-banana-2',
       input: {
         prompt: prompt,
         aspect_ratio: aspectRatio,
