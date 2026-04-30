@@ -73,16 +73,16 @@ export class CodexCliApiClient implements ApiClient {
         );
       }
       if (result.exitCode !== 0) {
-        const tail = result.stderr.split('\n').slice(-20).join('\n');
+        const diagnostic = await this.formatDiagnostic(workDir, result.stderr, 'stderr');
         throw new Error(
-          `Codex CLI がエラー終了しました (exit ${result.exitCode}). stderr 末尾:\n${tail}`,
+          `Codex CLI がエラー終了しました (exit ${result.exitCode}).\n${diagnostic}`,
         );
       }
 
       if (!fs.existsSync(outputPath)) {
-        const tail = result.stdout.split('\n').slice(-20).join('\n');
+        const diagnostic = await this.formatDiagnostic(workDir, result.stdout, 'stdout');
         throw new Error(
-          `Codex は完了しましたが出力ファイル ${outputPath} が見つかりません。stdout 末尾:\n${tail}`,
+          `Codex は完了しましたが出力ファイル ${outputPath} が見つかりません。\n${diagnostic}`,
         );
       }
 
@@ -97,8 +97,37 @@ export class CodexCliApiClient implements ApiClient {
         timestamp: Date.now(),
       };
     } finally {
-      await this.cleanup(workDir);
+      // codexKeepLogs ON 時は workDir を残してユーザーに後で見てもらう
+      if (!this.settings.codexKeepLogs) {
+        await this.cleanup(workDir);
+      }
     }
+  }
+
+  /**
+   * エラー時の診断テキストを組み立てる。
+   * codexKeepLogs ON のときはファイル末尾を読み込む。
+   * OFF のときは「詳細ログを ON にして再実行を」と案内。
+   */
+  private async formatDiagnostic(
+    workDir: string,
+    inMemoryTail: string,
+    streamName: 'stdout' | 'stderr',
+  ): Promise<string> {
+    if (this.settings.codexKeepLogs) {
+      const logPath = path.join(workDir, `.codex-${streamName}.log`);
+      const fileTail = await readTailSafe(logPath, 4096);
+      return [
+        `${streamName} 末尾 (詳細は ${logPath}):`,
+        fileTail || '(空)',
+        '',
+        `workDir: ${workDir} (Keep Logs ON のため保持されています。確認後に手動削除してください)`,
+      ].join('\n');
+    }
+    if (inMemoryTail) {
+      return `${streamName} 末尾:\n${inMemoryTail.split('\n').slice(-20).join('\n')}`;
+    }
+    return '詳細ログは保存されていません。設定で「Codex Keep Logs」を ON にして再試行してください。';
   }
 
   private buildCodexPrompt(
@@ -186,30 +215,56 @@ export class CodexCliApiClient implements ApiClient {
   /**
    * 画像生成時の codex 実行。
    *
-   * - stdio を完全 'ignore' にして renderer のイベントループを子プロセスから切り離す
-   *   (codex exec は数百KB〜数MB のログを吐くため、'pipe' でも 'fd リダイレクト' でも
-   *   renderer に何らかのオーバーヘッドが残る可能性があるため最も極端な策を取る)
-   * - detached: true + unref() で renderer のサブプロセスツリーから完全に独立させる
-   * - 終了は 'close' イベントで検知 (unref しても 'close' は発火する)
-   * - 結果として exit code とタイムアウトの有無のみが取得できる。診断ログは諦める。
+   * デフォルト (codexKeepLogs OFF): stdio 'ignore' + detached + unref で
+   *   renderer のイベントループから子プロセスを完全分離。診断ログは取れない。
+   * codexKeepLogs ON: stdio を fd ファイルにリダイレクト。fd は spawn 直後に親側で
+   *   close するので 'pipe' のような renderer 側受信は発生しない。エラー時に
+   *   workDir 内のログファイルを末尾だけ読んで診断可能。workDir は保持される。
+   *
+   * 終了は 'close' イベントで検知 (unref しても 'close' は発火する)。
    */
   private async runCodex(
     binary: string,
     args: string[],
     cwd: string,
   ): Promise<SpawnResult> {
+    const keepLogs = this.settings.codexKeepLogs;
+    let stdoutFd: number | null = null;
+    let stderrFd: number | null = null;
+    if (keepLogs) {
+      try {
+        stdoutFd = fs.openSync(path.join(cwd, '.codex-stdout.log'), 'w');
+        stderrFd = fs.openSync(path.join(cwd, '.codex-stderr.log'), 'w');
+      } catch (err) {
+        if (stdoutFd !== null) try { fs.closeSync(stdoutFd); } catch {}
+        if (stderrFd !== null) try { fs.closeSync(stderrFd); } catch {}
+        return {
+          exitCode: null,
+          signal: null,
+          stdout: '',
+          stderr: `[log file open error] ${err instanceof Error ? err.message : String(err)}`,
+          timedOut: false,
+        };
+      }
+    }
+
     return new Promise<SpawnResult>((resolve) => {
       let child: ReturnType<typeof spawn> | null = null;
       try {
         const { cmd, finalArgs } = adjustLaunch(binary, args);
+        const stdio: ('ignore' | number)[] = keepLogs && stdoutFd !== null && stderrFd !== null
+          ? ['ignore', stdoutFd, stderrFd]
+          : ['ignore', 'ignore', 'ignore'];
         child = spawn(cmd, finalArgs, {
           cwd,
           env: buildLaunchEnv(),
-          stdio: ['ignore', 'ignore', 'ignore'],
+          stdio,
           detached: true,
         });
         child.unref();
       } catch (err) {
+        if (stdoutFd !== null) try { fs.closeSync(stdoutFd); } catch {}
+        if (stderrFd !== null) try { fs.closeSync(stderrFd); } catch {}
         resolve({
           exitCode: null,
           signal: null,
@@ -219,6 +274,10 @@ export class CodexCliApiClient implements ApiClient {
         });
         return;
       }
+
+      // 親側の fd は spawn 直後に close (child 側が dup で保持して書き続ける)
+      if (stdoutFd !== null) try { fs.closeSync(stdoutFd); } catch {}
+      if (stderrFd !== null) try { fs.closeSync(stderrFd); } catch {}
 
       let timedOut = false;
       const timer = setTimeout(() => {
@@ -245,6 +304,27 @@ export class CodexCliApiClient implements ApiClient {
         resolve({ exitCode: code, signal, stdout: '', stderr: '', timedOut });
       });
     });
+  }
+}
+
+/**
+ * ログファイル末尾を安全に読む。読めなければ空文字列。
+ */
+async function readTailSafe(filePath: string, maxBytes: number): Promise<string> {
+  try {
+    const stat = await fs.promises.stat(filePath);
+    const fd = await fs.promises.open(filePath, 'r');
+    try {
+      const start = Math.max(0, stat.size - maxBytes);
+      const length = stat.size - start;
+      const buf = Buffer.alloc(length);
+      await fd.read(buf, 0, length, start);
+      return buf.toString('utf8');
+    } finally {
+      await fd.close().catch(() => {});
+    }
+  } catch {
+    return '';
   }
 }
 

@@ -515,6 +515,18 @@ class ThumbnailMachineSettingTab extends PluginSettingTab {
         );
 
       new Setting(containerEl)
+        .setName('Codex Keep Logs (詳細ログを保存)')
+        .setDesc('OFF (推奨): 安定動作優先、ログは取れない。ON: 各生成の workDir に stdout/stderr を保存し、エラー時の診断に使えるが Obsidian がフリーズしやすくなる場合がある。トラブル時のみ ON にして再現させる用。')
+        .addToggle((toggle) =>
+          toggle
+            .setValue(this.plugin.settings.codexKeepLogs)
+            .onChange(async (value: boolean) => {
+              this.plugin.settings.codexKeepLogs = value;
+              await this.plugin.saveSettings();
+            })
+        );
+
+      new Setting(containerEl)
         .setName('Codex CLI Login')
         .setDesc('ChatGPT アカウントでログイン。クリックするとブラウザが開いて OAuth 認証画面が表示されます。認証完了までボタンは無効化されます（最大5分）。')
         .addButton((button) =>

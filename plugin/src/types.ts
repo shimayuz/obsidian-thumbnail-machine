@@ -71,6 +71,7 @@ export interface PluginSettings {
   // Codex CLI 設定
   codexBinaryPath: string;   // 空文字なら PATH 解決
   codexTimeoutMs: number;    // プロセスタイムアウト (ms)
+  codexKeepLogs: boolean;    // 詳細ログを保持 (ON時は workDir を削除せず stdout/stderr をファイルに書く)
 
   // デフォルト生成設定
   defaultPlatform: Platform;
@@ -100,6 +101,7 @@ export const DEFAULT_SETTINGS: PluginSettings = {
 
   codexBinaryPath: '',
   codexTimeoutMs: 300000, // 5分
+  codexKeepLogs: false,
 
   defaultPlatform: 'youtube',
   defaultStyle: 'modern',
