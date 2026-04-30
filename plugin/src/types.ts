@@ -57,26 +57,36 @@ export const PLATFORM_CONFIGS: Record<Platform, PlatformConfig> = {
 /** 保存先の種類 */
 export type SaveLocation = 'vault' | 'specified';
 
+/** 画像生成プロバイダー */
+export type ImageProvider = 'kie' | 'codex';
+
 /** プラグイン設定 */
 export interface PluginSettings {
-  // API設定
+  // プロバイダー選択
+  imageProvider: ImageProvider;
+
+  // kie.ai 設定
   kieApiKey: string;
-  
+
+  // Codex CLI 設定
+  codexBinaryPath: string;   // 空文字なら PATH 解決
+  codexTimeoutMs: number;    // プロセスタイムアウト (ms)
+
   // デフォルト生成設定
   defaultPlatform: Platform;
   defaultStyle: ImageStyle;
   language: Language;
-  
+
   // 保存設定
   saveLocation: SaveLocation;
   attachmentFolder: string;
   fileNameFormat: string; // {title}-{platform}-{timestamp}
   insertToNote: boolean; // ノートのトップに挿入するか
-  
+
   // プロンプト設定
   customPromptPrefix: string;
   customPromptSuffix: string;
-  
+
   // noteプラットフォーム専用設定
   noteSafeMargin: boolean; // noteの上下セーフマージンを有効にするか
   noteSafeMarginSize: number; // セーフマージンのサイズ（px）
@@ -84,20 +94,25 @@ export interface PluginSettings {
 
 /** デフォルト設定 */
 export const DEFAULT_SETTINGS: PluginSettings = {
+  imageProvider: 'kie',
+
   kieApiKey: '',
-  
+
+  codexBinaryPath: '',
+  codexTimeoutMs: 300000, // 5分
+
   defaultPlatform: 'youtube',
   defaultStyle: 'modern',
   language: 'ja',
-  
+
   saveLocation: 'specified',
   attachmentFolder: 'attachments/thumbnails',
   fileNameFormat: '{title}-{platform}-{timestamp}',
   insertToNote: true,
-  
+
   customPromptPrefix: '',
   customPromptSuffix: '',
-  
+
   noteSafeMargin: true,
   noteSafeMarginSize: 20,
 };

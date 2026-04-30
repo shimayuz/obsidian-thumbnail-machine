@@ -1,6 +1,6 @@
 {
   "name": "obsidian-thumbnail-machine",
-  "version": "0.2.1",
+  "version": "0.3.0",
   "description": "Generate AI-powered thumbnails for YouTube, note.com, and Udemy",
   "main": "main.js",
   "scripts": {

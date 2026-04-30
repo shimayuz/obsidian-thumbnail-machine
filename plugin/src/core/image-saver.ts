@@ -29,17 +29,17 @@ export class ImageSaver {
     const filePath = normalizePath(`${folderPath}/${fileName}`);
 
     // Base64 から ArrayBuffer に変換
+    // atob+for ループだと 800KB で renderer メインスレッドを 100ms+ ブロックする。
+    // Node の Buffer (native) を使って高速デコード。
     if (!result.imageBase64) {
       throw new Error('No image data to save');
     }
-    const binary = atob(result.imageBase64);
-    const bytes = new Uint8Array(binary.length);
-    for (let i = 0; i < binary.length; i++) {
-      bytes[i] = binary.charCodeAt(i);
-    }
+    const decoded = Buffer.from(result.imageBase64, 'base64');
+    const arrayBuffer = new ArrayBuffer(decoded.length);
+    new Uint8Array(arrayBuffer).set(decoded);
 
     // ファイルを作成
-    await this.app.vault.createBinary(filePath, bytes.buffer);
+    await this.app.vault.createBinary(filePath, arrayBuffer);
 
     return filePath;
   }

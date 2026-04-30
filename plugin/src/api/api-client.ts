@@ -4,8 +4,10 @@
  */
 
 import { requestUrl } from 'obsidian';
-import type { PluginSettings, ThumbnailRequest, ThumbnailResult, Platform } from '../types';
-import { PLATFORM_CONFIGS as platformConfigs, APPEAL_AXIS_CONFIGS } from '../types';
+import type { PluginSettings, ThumbnailRequest, ThumbnailResult } from '../types';
+import { PLATFORM_CONFIGS as platformConfigs } from '../types';
+import { buildPrompt } from './prompt-builder';
+import { CodexCliApiClient } from './codex-cli-client';
 
 export interface ApiClient {
   generateThumbnail(request: ThumbnailRequest): Promise<ThumbnailResult>;
@@ -18,7 +20,7 @@ export class KieApiClient implements ApiClient {
   constructor(private settings: PluginSettings) {}
 
   async generateThumbnail(request: ThumbnailRequest): Promise<ThumbnailResult> {
-    const prompt = this.buildPrompt(request);
+    const prompt = buildPrompt(request, this.settings);
     const config = platformConfigs[request.platform];
     
     // アスペクト比をkie.ai形式に変換
@@ -227,117 +229,17 @@ export class KieApiClient implements ApiClient {
     return btoa(binary);
   }
 
-  private buildPrompt(request: ThumbnailRequest): string {
-    const config = platformConfigs[request.platform];
-    
-    // 訴求軸が指定されている場合は専用プロンプトを生成
-    if (request.appealAxis) {
-      return this.buildAppealAxisPrompt(request);
-    }
-
-    const styleDescriptions: Record<string, string> = {
-      modern: 'clean, modern design with professional typography',
-      bold: 'bold, eye-catching design with strong contrast and impact',
-      minimal: 'minimalist design with lots of white space',
-      gradient: 'vibrant gradient background with modern aesthetics',
-      photo: 'photo-realistic background with text overlay',
-      illustration: 'illustrated style with creative graphics',
-    };
-
-    const platformPrompts: Record<Platform, string> = {
-      youtube: 'YouTube video thumbnail that grabs attention and encourages clicks',
-      note: 'note.com article eye-catch image that is elegant and readable',
-      udemy: 'Udemy course thumbnail that looks professional and educational',
-    };
-
-    let prompt = `Create a ${platformPrompts[request.platform]}.\n`;
-    prompt += `Style: ${styleDescriptions[request.style]}\n`;
-    prompt += `Title text: "${request.title}"${request.language === 'ja' ? ' (in Japanese)' : ''}\n`;
-    
-    if (request.subtitle) {
-      prompt += `Subtitle: "${request.subtitle}"\n`;
-    }
-    
-    if (request.keywords && request.keywords.length > 0) {
-      prompt += `Keywords/themes: ${request.keywords.join(', ')}\n`;
-    }
-    
-    prompt += `Size: ${config.width}x${config.height} pixels (${config.aspectRatio} aspect ratio)\n`;
-    prompt += `The text should be clearly readable and be the main focus.\n`;
-    prompt += `Do not include any watermarks or logos.\n`;
-    
-    // noteプラットフォーム用のセーフマージン指示
-    if (request.platform === 'note' && this.settings.noteSafeMargin) {
-      const margin = this.settings.noteSafeMarginSize || 20;
-      prompt += `IMPORTANT: Keep the top and bottom ${margin}px of the image empty (no text, no important elements). This is a safe margin area that may be cropped when displayed.\n`;
-    }
-
-    if (this.settings.customPromptPrefix) {
-      prompt = this.settings.customPromptPrefix + '\n' + prompt;
-    }
-    if (this.settings.customPromptSuffix) {
-      prompt += '\n' + this.settings.customPromptSuffix;
-    }
-    if (request.customPrompt) {
-      prompt += '\n' + request.customPrompt;
-    }
-
-    return prompt;
-  }
-
-  /**
-   * 訴求軸に基づいたプロンプトを生成
-   */
-  private buildAppealAxisPrompt(request: ThumbnailRequest): string {
-    const axisConfig = APPEAL_AXIS_CONFIGS.find(c => c.id === request.appealAxis);
-    if (!axisConfig) {
-      throw new Error(`Unknown appeal axis: ${request.appealAxis}`);
-    }
-
-    const config = platformConfigs[request.platform];
-    
-    // YouTubeサムネ風note表紙用のプロンプトフォーマット
-    let prompt = `YouTube thumbnail, professional design, `;
-    prompt += `${axisConfig.promptElements}, `;
-    prompt += `Japanese text "${request.title}", `;
-    
-    if (request.subtitle) {
-      prompt += `subtitle "${request.subtitle}", `;
-    }
-    
-    if (request.keywords && request.keywords.length > 0) {
-      prompt += `themes: ${request.keywords.join(', ')}, `;
-    }
-
-    // アスペクト比を追加
-    prompt += `--ar ${config.aspectRatio === '1.91:1' ? '16:9' : config.aspectRatio} --v 6`;
-    
-    // noteプラットフォーム用のセーフマージン指示
-    if (request.platform === 'note' && this.settings.noteSafeMargin) {
-      const margin = this.settings.noteSafeMarginSize || 20;
-      prompt += `, keep top and bottom ${margin}px empty as safe margin`;
-    }
-
-    if (this.settings.customPromptPrefix) {
-      prompt = this.settings.customPromptPrefix + '\n' + prompt;
-    }
-    if (this.settings.customPromptSuffix) {
-      prompt += '\n' + this.settings.customPromptSuffix;
-    }
-    if (request.customPrompt) {
-      prompt += '\n' + request.customPrompt;
-    }
-
-    return prompt;
-  }
 }
 
 /**
  * API クライアントファクトリ
  */
 export function createApiClient(settings: PluginSettings): ApiClient {
-  if (settings.kieApiKey) {
-    return new KieApiClient(settings);
+  if (settings.imageProvider === 'codex') {
+    return new CodexCliApiClient(settings);
   }
-  throw new Error('KIE API key not configured. Please set KIE API key in settings.');
+  if (!settings.kieApiKey) {
+    throw new Error('KIE API key not configured. Please set KIE API key in settings.');
+  }
+  return new KieApiClient(settings);
 }

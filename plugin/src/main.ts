@@ -17,9 +17,10 @@ import {
   AbstractInputSuggest,
 } from 'obsidian';
 
-import type { PluginSettings, GenerationProgress, Platform, ImageStyle } from './types';
+import type { PluginSettings, GenerationProgress, Platform, ImageStyle, ImageProvider } from './types';
 import { DEFAULT_SETTINGS, PLATFORM_CONFIGS, APPEAL_AXIS_CONFIGS } from './types';
 import { createApiClient, ApiClient } from './api/api-client';
+import { testCodexConnection, startCodexLogin } from './api/codex-cli-client';
 import { NoteExtractor } from './core/note-extractor';
 import { ImageSaver } from './core/image-saver';
 import { GenerationModal } from './ui/generation-modal';
@@ -101,8 +102,8 @@ export default class ThumbnailMachinePlugin extends Plugin {
       return;
     }
 
-    // API キーチェック
-    if (!this.settings.kieApiKey) {
+    // Provider 設定チェック
+    if (this.settings.imageProvider === 'kie' && !this.settings.kieApiKey) {
       new Notice('Please configure your KIE API key in settings');
       return;
     }
@@ -135,8 +136,8 @@ export default class ThumbnailMachinePlugin extends Plugin {
       return;
     }
 
-    // API キーチェック
-    if (!this.settings.kieApiKey) {
+    // Provider 設定チェック
+    if (this.settings.imageProvider === 'kie' && !this.settings.kieApiKey) {
       new Notice('Please configure your KIE API key in settings');
       return;
     }
@@ -169,7 +170,7 @@ export default class ThumbnailMachinePlugin extends Plugin {
     try {
       this.apiClient = createApiClient(this.settings);
     } catch (e) {
-      new Notice('KIE API key not configured');
+      new Notice(`Provider 初期化エラー: ${e instanceof Error ? e.message : String(e)}`);
       return;
     }
 
@@ -277,7 +278,7 @@ export default class ThumbnailMachinePlugin extends Plugin {
     try {
       this.apiClient = createApiClient(this.settings);
     } catch (e) {
-      new Notice('KIE API key not configured');
+      new Notice(`Provider 初期化エラー: ${e instanceof Error ? e.message : String(e)}`);
       return;
     }
 
@@ -434,41 +435,131 @@ class ThumbnailMachineSettingTab extends PluginSettingTab {
 
     containerEl.createEl('h2', { text: 'Thumbnail Machine Settings' });
 
-    // API設定セクション
-    containerEl.createEl('h3', { text: 'API Settings' });
+    // Provider 設定セクション
+    containerEl.createEl('h3', { text: 'Provider Settings' });
 
-    // APIキー入力（マスキング付き）
-    const apiKeySetting = new Setting(containerEl)
-      .setName('KIE API Key')
-      .setDesc('KIE API key for image generation');
+    new Setting(containerEl)
+      .setName('Image Provider')
+      .setDesc('画像生成プロバイダーを選択。Codex CLI は ChatGPT サブスク認証で動作（要事前 `codex login`）。')
+      .addDropdown((dropdown: DropdownComponent) =>
+        dropdown
+          .addOption('kie', 'kie.ai (nano-banana-2)')
+          .addOption('codex', 'OpenAI Codex CLI (built-in image_gen)')
+          .setValue(this.plugin.settings.imageProvider)
+          .onChange(async (value: string) => {
+            this.plugin.settings.imageProvider = value as ImageProvider;
+            await this.plugin.saveSettings();
+            this.display();
+          })
+      );
 
-    let apiKeyInput: HTMLInputElement;
-    let isVisible = false;
+    if (this.plugin.settings.imageProvider === 'kie') {
+      const apiKeySetting = new Setting(containerEl)
+        .setName('KIE API Key')
+        .setDesc('KIE API key for image generation');
 
-    apiKeySetting.addText((text: TextComponent) => {
-      text
-        .setPlaceholder('Enter your KIE API key')
-        .setValue(this.plugin.settings.kieApiKey)
-        .onChange(async (value: string) => {
-          this.plugin.settings.kieApiKey = value;
-          await this.plugin.saveSettings();
-        });
-      apiKeyInput = text.inputEl;
-      apiKeyInput.type = 'password';
-      apiKeyInput.style.width = '100%';
-    });
+      let apiKeyInput: HTMLInputElement;
+      let isVisible = false;
 
-    // 表示/非表示トグルボタン（目のアイコン）
-    apiKeySetting.addButton((button) => {
-      button
-        .setIcon('eye')
-        .setTooltip('APIキーを表示/非表示')
-        .onClick(() => {
-          isVisible = !isVisible;
-          apiKeyInput.type = isVisible ? 'text' : 'password';
-          button.setIcon(isVisible ? 'eye-off' : 'eye');
-        });
-    });
+      apiKeySetting.addText((text: TextComponent) => {
+        text
+          .setPlaceholder('Enter your KIE API key')
+          .setValue(this.plugin.settings.kieApiKey)
+          .onChange(async (value: string) => {
+            this.plugin.settings.kieApiKey = value;
+            await this.plugin.saveSettings();
+          });
+        apiKeyInput = text.inputEl;
+        apiKeyInput.type = 'password';
+        apiKeyInput.style.width = '100%';
+      });
+
+      apiKeySetting.addButton((button) => {
+        button
+          .setIcon('eye')
+          .setTooltip('APIキーを表示/非表示')
+          .onClick(() => {
+            isVisible = !isVisible;
+            apiKeyInput.type = isVisible ? 'text' : 'password';
+            button.setIcon(isVisible ? 'eye-off' : 'eye');
+          });
+      });
+    } else if (this.plugin.settings.imageProvider === 'codex') {
+      new Setting(containerEl)
+        .setName('Codex CLI Binary Path')
+        .setDesc('空欄で自動検出 (~/.npm-global/bin/codex, /opt/homebrew/bin/codex, /usr/local/bin/codex の順)。GUI起動時にPATHが通らない場合は絶対パスを指定。')
+        .addText((text: TextComponent) =>
+          text
+            .setPlaceholder('/Users/you/.npm-global/bin/codex')
+            .setValue(this.plugin.settings.codexBinaryPath)
+            .onChange(async (value: string) => {
+              this.plugin.settings.codexBinaryPath = value.trim();
+              await this.plugin.saveSettings();
+            })
+        );
+
+      new Setting(containerEl)
+        .setName('Codex Timeout (ms)')
+        .setDesc('1枚あたりのタイムアウト。生成は通常1〜3分。')
+        .addText((text: TextComponent) =>
+          text
+            .setPlaceholder('300000')
+            .setValue(String(this.plugin.settings.codexTimeoutMs))
+            .onChange(async (value: string) => {
+              const parsed = Number(value);
+              if (Number.isFinite(parsed) && parsed >= 30000) {
+                this.plugin.settings.codexTimeoutMs = parsed;
+                await this.plugin.saveSettings();
+              }
+            })
+        );
+
+      new Setting(containerEl)
+        .setName('Codex CLI Login')
+        .setDesc('ChatGPT アカウントでログイン。クリックするとブラウザが開いて OAuth 認証画面が表示されます。認証完了までボタンは無効化されます（最大5分）。')
+        .addButton((button) =>
+          button
+            .setButtonText('ログイン')
+            .onClick(async () => {
+              button.setDisabled(true).setButtonText('ブラウザで認証中...');
+              const progressNotice = new Notice('Codex login を起動しています...', 0);
+              try {
+                const result = await startCodexLogin(
+                  this.plugin.settings,
+                  (line) => {
+                    progressNotice.setMessage(`Codex login: ${line.slice(0, 200)}`);
+                  },
+                );
+                progressNotice.hide();
+                new Notice(result.message, result.ok ? 7000 : 12000);
+              } catch (error) {
+                progressNotice.hide();
+                new Notice(`ログイン失敗: ${error instanceof Error ? error.message : String(error)}`, 10000);
+              } finally {
+                button.setDisabled(false).setButtonText('ログイン');
+              }
+            })
+        );
+
+      new Setting(containerEl)
+        .setName('Codex CLI 接続テスト')
+        .setDesc('codex --version と codex login status を確認します。')
+        .addButton((button) =>
+          button
+            .setButtonText('テスト実行')
+            .onClick(async () => {
+              button.setDisabled(true).setButtonText('テスト中...');
+              try {
+                const result = await testCodexConnection(this.plugin.settings);
+                new Notice(result.message, result.ok ? 5000 : 10000);
+              } catch (error) {
+                new Notice(`テスト失敗: ${error instanceof Error ? error.message : String(error)}`, 10000);
+              } finally {
+                button.setDisabled(false).setButtonText('テスト実行');
+              }
+            })
+        );
+    }
 
     // デフォルト設定セクション
     containerEl.createEl('h3', { text: 'Default Settings' });
